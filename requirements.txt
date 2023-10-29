@@ -1,0 +1,8 @@
+ #Requirements file for assignments in Supervised-ML 2023
+ ##Change your preferred option for jupyter notebook/jupyter lab accordingly
+ 
+ scikit-learn>=0.19
+ matplotlib>=2.0.0
+ numpy>=1.8.2
+ scipy>=0.13.3
+ jupyterlab
