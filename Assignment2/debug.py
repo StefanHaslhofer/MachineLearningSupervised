@@ -8,197 +8,196 @@ from mpl_toolkits.mplot3d import Axes3D
 import random
 
 
+Z = np.genfromtxt('normal.csv', delimiter=',')
+X, y = Z[:,:-1], Z[:,-1]
+
+def est_mean_cov(X_, y_):
+    """
+    Function that estimates the means and covariance matrices from the given data as well
+    as the probability to encounter a positive/negative example respectively
+    @param X_, np ndarray, data matrix
+    @param y_, np ndarray, data vector
+    Returns
+    covX, covXpos, covXneg: covariance matrices for entire dataset, positive samples, negative samples
+    meanX, meanXpos, meanXneg: means for entire dataset, positive samples, negative samples
+    p_ypos, p_yneg: probabilites p(y=+1), p(y=-1)
+    """
+    # your code goes here ↓↓↓
+    groups = pd.DataFrame(dict(
+        x1=X_[:, 0],
+        x2=X_[:, 1],
+        label=y_
+    )).groupby('label')
+
+    # means
+    mean = groups.mean()
+    meanX = [
+        sum(mean.x1.values) / len(mean.x1),
+        sum(mean.x2.values) / len(mean.x2)
+    ]
+    meanXpos = [mean.x1[1], mean.x2[1]]
+    meanXneg = [mean.x1[-1], mean.x2[-1]]
+
+    # covariance
+    cov = groups.cov()
+
+    covX = pd.DataFrame(dict(
+        x1=X_[:, 0],
+        x2=X_[:, 1]
+    )).cov()
+    covXpos = [
+        [cov.x1[1].x1, cov.x1[1].x2],
+        [cov.x2[1].x1, cov.x2[1].x2]
+    ]
+    covXneg = [
+        [cov.x1[-1].x1, cov.x1[-1].x2],
+        [cov.x2[-1].x1, cov.x2[-1].x2]
+    ]
+
+    # probabilities
+    p_ypos = len(groups.get_group(1)) / len(y_)
+    p_yneg = 1 - p_ypos
+
+    return (meanX, covX, meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
+
 # Nothing to do here, just run the cell.
+meanX, covX, meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg = est_mean_cov(X,y)
 
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 
-# do not change the seed
-np.random.seed(12)
-
-def pol_reg_pred(X_train,y_train,X_test,m):
+def calc_par_A(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg):
     """
-    Function that trains a polynomial regression model with degree on a given training set
-    and returns the prediction for a given test set (uniformly sampled values without labels).
-    @param X_train, np.ndarray, training samples
-    @param y_train, np.ndarray, training labels
-    @param X_test, np.ndarray, test samples
-    @param m, int, degree of polynomial
-    """
-    np.random.seed(12)
-    poly_reg = PolynomialFeatures(m)
-    X_poly_train = poly_reg.fit_transform(X_train.reshape(-1, 1))
-    X_poly_test= poly_reg.fit_transform(X_test.reshape(-1, 1))
-    lin_reg = LinearRegression()
-    lin_reg.fit(X_poly_train, y_train)
-    y_pred = lin_reg.predict(X_poly_test)
-    return y_pred
-
-
-def func_f(x):
-    """
-    Implementation of the polynomial from 4.1
-    @param x, value you pass to the function
-    """
-    # your code goes here ↓↓↓
-
-    return 0.5 * pow(x, 4) + 2 * pow(x, 3) - 8 * pow(x, 2)
-
-
-def create_train_X(k, l, xmin, xmax):
-    """
-    Function that creates k training sets with l samples
-    @param k, number of training sets to create
-    @param l, number of samples per training set
-    @param xmin, lower bound of sample interval
-    @param xmax, upper bound of sample interval
-    """
-    # use the numpy.random module and dont change the seed!
-    np.random.seed(12)
-
-    # your code goes here ↓↓↓
-    train_x = np.random.uniform(low=xmin, high=xmax, size=(k, l))
-    return train_x
-
-
-def create_train_y(k, l, X_train, mu, std, func):
-    """
-    Function that creates labels from training data with func_f and gaussian noise
-    @param k, number of label sets to create
-    @param l, number of labels per set
-    @param X_train, training set
-    @param mu, mean of gaussian
-    @param std, std of gaussian
-    @param func, callable, polynomial function
+    This function should contain the calculations for the respective parameter and return the result.
+    @param meanXpos, np ndarray, mean of positive examples
+    @param covXpos, np ndarray, covariance matrix of positive examples
+    @param meanXneg, np ndarray, mean of negative examples
+    @param covXneg, np ndarray, covariance matrix of negative examples
+    @param p_ypos, float, probability of encountering a positive example
+    @param p_yneg, float, probability of encountering a negative example
     returns np.ndarray
     """
-    # use the numpy.random module and dont change the seed!
-    np.random.seed(12)
-
     # your code goes here ↓↓↓
-    noise = np.random.normal(mu, std, size=(k, l))
-    train_y = np.zeros((k, l))
+    par_A = np.linalg.inv(covXpos) - np.linalg.inv(covXneg)
 
-    for k_i in range(k):
-        for l_i in range(l):
-            train_y[k_i][l_i] = func(X_train[k_i][l_i]) + noise[k_i][l_i]
+    return par_A
 
-    return train_y
-
-
-def bias_var(X_train, y_train, M, k, func):
+def calc_par_b(meanXpos,covXpos,meanXneg,covXneg,p_ypos,p_yneg):
     """
-    Function that computes model bias and variance
-    @param X_train, np.ndarray, training data
-    @param y_train, np.ndarray, training labels
-    @param M, int, upper bound on m (degree of the polynomial)
-    @param k, int, number of sample sets
-    @param func, callable, polynomial function
-    returns sqbias,variance
+    This function should contain the calculations for the respective parameter and return the result.
+    @param meanXpos, np ndarray, mean of positive examples
+    @param covXpos, np ndarray, covariance matrix of positive examples
+    @param meanXneg, np ndarray, mean of negative examples
+    @param covXneg, np ndarray, covariance matrix of negative examples
+    @param p_ypos, float, probability of encountering a positive example
+    @param p_yneg, float, probability of encountering a negative example
+    returns np.ndarray
     """
-    x0 = np.array([1.7])
-    sqbias = []
-    variance = []
+    #your code goes here ↓↓↓
+    par_b = np.matmul(np.linalg.inv(covXpos), meanXpos) - np.matmul(np.linalg.inv(covXneg), meanXneg)
 
+    return par_b
+
+
+def calc_par_c(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg):
+    """
+    This function should contain the calculations for the respective parameter and return the result.
+    @param meanXpos, np ndarray, mean of positive examples
+    @param covXpos, np ndarray, covariance matrix of positive examples
+    @param meanXneg, np ndarray, mean of negative examples
+    @param covXneg, np ndarray, covariance matrix of negative examples
+    @param p_ypos, float, probability of encountering a positive example
+    @param p_yneg, float, probability of encountering a negative example
+    returns np.float64
+    """
     # your code goes here ↓↓↓
-    for m_i in range(M):
-        y_pred = []
-        for k_i in range(k):
-            y_pred.append(pol_reg_pred(X_train[k_i], y_train[k_i], x0, m_i + 1))
-        sqbias.append((func(x0[0]) - np.mean(y_pred))** 2)
-        variance.append(np.mean((y_pred - np.mean(y_pred))** 2))
+    c1_neg = -(1 / 2) * np.matmul(np.transpose(meanXpos), np.matmul(np.linalg.inv(covXpos), meanXpos))
+    c1_pos = +(1 / 2) * np.matmul(np.transpose(meanXneg), np.matmul(np.linalg.inv(covXneg), meanXneg))
 
-    return (sqbias, variance)
+    det_neg = -(1 / 2) * np.log(np.linalg.det(covXpos))
+    det_pos = (1 / 2) * np.log(np.linalg.det(covXneg))
 
-## If you get deprecation warnings from numpy in the following cell, uncomment these two lines:
-#import warnings
-#warnings.filterwarnings('ignore')
-## Else: Nothing to do here, just run the cell.
-k = 300
-l = 25
-M = 11
-xmin=-1
-xmax=3
-mu=0
-sigmasq=4
-std=np.sqrt(sigmasq)
+    par_c = c1_neg + c1_pos + det_neg + det_pos + np.log(p_ypos) - np.log(p_yneg)
 
-X_train = create_train_X(k,l,xmin,xmax)
-y_train = create_train_y(k,l,X_train,mu,std,func_f)
-sqbias, variance = bias_var(X_train,y_train,M,k,func_f)
+    return par_c
 
-print("Shapes of X and y: \n",X_train.shape,y_train.shape)
-print("\nSquared Bias over m: \n", sqbias)
-print("\nVariance over m: \n", variance)
 
-## test data, from -1 to 3 in steps of 0.01
+def calc_func_g(par_A, par_b, par_c, gridpoints):
+    """
+    Combine the previously calculated parameters to the optimal classification function g.
+    Return in shape [500,500]. The 500x500 grid will plot nicely later.
+    Avoid hardcoding, i.e. use int(np.sqrt(gridpoints.shape[0]) instead of the number 500
+    @param gridpoints, np.array, the points the function g should be applied to
+    returns np.ndarray of shape (500,500)
+    """
+    # your code goes here ↓↓↓
+    g = np.empty((int(np.sqrt(gridpoints.shape[0])), int(np.sqrt(gridpoints.shape[0]))))
+    for x1 in range(g.shape[0]):
+        for x2 in range(g.shape[1]):
+            x_vec = gridpoints[x1 * 500 + x2]
+            g[x1][x2] = (-(1 / 2) * np.matmul(np.transpose(x_vec), np.matmul(par_A, x_vec)) + np.matmul(
+                np.transpose(par_b), x_vec) + par_c)
+
+    return np.sign(g)
+
+
 # Nothing to do here, just run the cell.
-np.random.seed(12)
-x_ = np.arange(xmin, xmax, 0.01)   ## test data, from -1 to 3 in steps of 0.01
+
+X1, X2 = np.mgrid[-11:11:500j, -11:11:500j]
+gridpoints = np.c_[X1.ravel(), X2.ravel()]
+
+par_A = calc_par_A(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
+par_b = calc_par_b(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
+par_c = calc_par_c(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
+func_g = calc_func_g(par_A, par_b, par_c, gridpoints)
+print("gridponts.shape =", gridpoints.shape, "\n")
+print("func_g.shape =", func_g.shape, "\n")
+print("A = ", par_A)
+print("A.shape = ", par_A.shape, "\n")
+print("b = ", par_b)
+print("b.shape = ", par_b.shape, "\n")
+print("c = ", par_c)
+print("c.shape = ", par_c.shape)
 
 
-def plot3(X_train, y_train, x, pol_reg_):
-    """creates a plot for the training data and the corresponding regression models with different m
-
+# Visualize the data and the classifier with a scatter plot
+def scatter_plot2(X, X1, X2, y, g):
+    """Creates a scatter-plot for the dataset X with labels y and the classification function g
     Parameters
     ----------
-    X_train : np.ndarray
-        training data
-    y_train : np.ndarray
+    X : np.ndarray
+        data
+    X1: np.ndarray
+        grid x values
+    X2: np.ndarray
+        grid y values
+    y : np.ndarray
         labels
-    x       : np.ndarray
-        test data
-    pol_reg_ : function
-        polynomial regression function
+    g : np.ndarray
+        the matrix from your Gaussian classifier
     Returns
     -------
     Figure
         a matplotlib figure object
     """
-    fig3 = plt.figure(figsize=(8, 5))
+    fig2 = plt.figure(figsize=(8, 5))
     # your code goes here ↓↓↓
-    plt.title('Polynomial Regression Prediction', fontweight='bold')
-    plt.scatter(X_train[0], y_train[0])
-    plt.plot(x, pol_reg_pred(X_train[0], y_train[0], x, 1), c='r', label='m=1')
-    plt.plot(x, pol_reg_pred(X_train[0], y_train[0], x, 3), c='y', label='m=3')
-    plt.plot(x, pol_reg_pred(X_train[0], y_train[0], x, 11), c='m', label='m=11')
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.legend()
-    plt.show()
-    return fig3
-
-
-def plot4(M, sigmasq, biassq, var):
-    """creates a plot for  unavoidable error, bias, variance and EPE vs. m in [1,11]
-
-    Parameters
-    ----------
-    M    : int
-        m is in [1,M]
-    sigmasq: float
-        unavoidable error
-    biassq : np.ndarray
-        squared bias
-    var  : np.ndarray
-        model variance
-    Returns
-    -------
-    Figure
-        a matplotlib figure object
-    """
-    fig4 = plt.figure(figsize=(8, 5))
+    fig2 = plt.figure(figsize=(8, 5))
     # your code goes here ↓↓↓
-    plt.title('Error to degree of the polynomial', fontweight='bold')
-    plt.plot(range(M), np.full(M, sigmasq), c='r', label='unavoidable error')
-    plt.plot(range(M), biassq, c='b', label='squared bias')
-    plt.plot(range(M), var, color='orange', label='variance')
-    plt.plot(range(M), np.sum([biassq, var, np.full(M, sigmasq)], axis=0), c='g', label='total EPE', ls='--')
-    plt.xlabel("m")
-    plt.ylabel("Error")
-    plt.legend()
-    plt.show()
-    return fig4
+    df = pd.DataFrame(dict(
+        x1=X[:, 0],
+        x2=X[:, 1],
+        label=y
+    ))
 
-fig4 = plot4(M, sigmasq, sqbias, variance)
-assert isinstance(fig4, Figure)
+
+
+
+    plt.scatter(X1[1 == g[:]], X2[1 == g[:]], s=1, alpha=0.05, zorder=-1)
+    plt.scatter(X1[-1 == g[:]], X2[-1 == g[:]], s=1, alpha=0.05, zorder=-1)
+    plt.show()
+
+    return fig2
+
+# Nothing to do here, just run the cell.
+g = calc_func_g(par_A,par_b,par_c,gridpoints)
+fig = scatter_plot2(X, X1, X2, y, g)
+assert isinstance(fig, Figure)
