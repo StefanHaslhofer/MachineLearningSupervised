@@ -1,203 +1,192 @@
-import sklearn
+#Nothing to do here
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from scipy.stats import multivariate_normal
-from mpl_toolkits.mplot3d import Axes3D
 import random
+import csv
+from typing import Sequence, List, Tuple
+
+np.random.seed(1234)  
+
+import warnings
+warnings.filterwarnings("ignore")
+
+from IPython.core.display import display, HTML
+display(HTML("<style>.container { width:100% !important; }</style>"))
+
+from sklearn import svm
 
 
-Z = np.genfromtxt('normal.csv', delimiter=',')
-X, y = Z[:,:-1], Z[:,-1]
-
-def est_mean_cov(X_, y_):
-    """
-    Function that estimates the means and covariance matrices from the given data as well
-    as the probability to encounter a positive/negative example respectively
-    @param X_, np ndarray, data matrix
-    @param y_, np ndarray, data vector
-    Returns
-    covX, covXpos, covXneg: covariance matrices for entire dataset, positive samples, negative samples
-    meanX, meanXpos, meanXneg: means for entire dataset, positive samples, negative samples
-    p_ypos, p_yneg: probabilites p(y=+1), p(y=-1)
-    """
-    # your code goes here ↓↓↓
-    groups = pd.DataFrame(dict(
-        x1=X_[:, 0],
-        x2=X_[:, 1],
-        label=y_
-    )).groupby('label')
-
-    # means
-    mean = groups.mean()
-    meanX = [
-        sum(mean.x1.values) / len(mean.x1),
-        sum(mean.x2.values) / len(mean.x2)
-    ]
-    meanXpos = [mean.x1[1], mean.x2[1]]
-    meanXneg = [mean.x1[-1], mean.x2[-1]]
-
-    # covariance
-    cov = groups.cov()
-
-    covX = pd.DataFrame(dict(
-        x1=X_[:, 0],
-        x2=X_[:, 1]
-    )).cov()
-    covXpos = [
-        [cov.x1[1].x1, cov.x1[1].x2],
-        [cov.x2[1].x1, cov.x2[1].x2]
-    ]
-    covXneg = [
-        [cov.x1[-1].x1, cov.x1[-1].x2],
-        [cov.x2[-1].x1, cov.x2[-1].x2]
-    ]
-
-    # probabilities
-    p_ypos = len(groups.get_group(1)) / len(y_)
-    p_yneg = 1 - p_ypos
-
-    return (meanX, covX, meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
-
-# Nothing to do here, just run the cell.
-meanX, covX, meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg = est_mean_cov(X,y)
+# Nothing to do here
+def load_data(id_data: int = 1):
+    """Function allows to load data from csv
+    @returns: tuple (X,y)"""
+    if id_data == 1:
+        Z = np.genfromtxt('radial_data.csv', delimiter=',')
+        return Z[:, :-1], Z[:, -1]
 
 
-def calc_par_A(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg):
-    """
-    This function should contain the calculations for the respective parameter and return the result.
-    @param meanXpos, np ndarray, mean of positive examples
-    @param covXpos, np ndarray, covariance matrix of positive examples
-    @param meanXneg, np ndarray, mean of negative examples
-    @param covXneg, np ndarray, covariance matrix of negative examples
-    @param p_ypos, float, probability of encountering a positive example
-    @param p_yneg, float, probability of encountering a negative example
-    returns np.ndarray
-    """
-    # your code goes here ↓↓↓
-    par_A = np.linalg.inv(covXpos) - np.linalg.inv(covXneg)
-
-    return par_A
-
-def calc_par_b(meanXpos,covXpos,meanXneg,covXneg,p_ypos,p_yneg):
-    """
-    This function should contain the calculations for the respective parameter and return the result.
-    @param meanXpos, np ndarray, mean of positive examples
-    @param covXpos, np ndarray, covariance matrix of positive examples
-    @param meanXneg, np ndarray, mean of negative examples
-    @param covXneg, np ndarray, covariance matrix of negative examples
-    @param p_ypos, float, probability of encountering a positive example
-    @param p_yneg, float, probability of encountering a negative example
-    returns np.ndarray
-    """
-    #your code goes here ↓↓↓
-    par_b = np.matmul(np.linalg.inv(covXpos), meanXpos) - np.matmul(np.linalg.inv(covXneg), meanXneg)
-
-    return par_b
+def get_meshgrid(X, resolution):
+    """Function creates space/grid. Mostly used for plotting"""
+    s = np.max(np.abs(X)) * 1.05
+    ls = np.linspace(-s, s, resolution)
+    X1, X2 = np.meshgrid(ls, ls, sparse=False)
+    return np.c_[X1.ravel(), X2.ravel()]
 
 
-def calc_par_c(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg):
-    """
-    This function should contain the calculations for the respective parameter and return the result.
-    @param meanXpos, np ndarray, mean of positive examples
-    @param covXpos, np ndarray, covariance matrix of positive examples
-    @param meanXneg, np ndarray, mean of negative examples
-    @param covXneg, np ndarray, covariance matrix of negative examples
-    @param p_ypos, float, probability of encountering a positive example
-    @param p_yneg, float, probability of encountering a negative example
-    returns np.float64
-    """
-    # your code goes here ↓↓↓
-    c1_neg = -(1 / 2) * np.matmul(np.transpose(meanXpos), np.matmul(np.linalg.inv(covXpos), meanXpos))
-    c1_pos = +(1 / 2) * np.matmul(np.transpose(meanXneg), np.matmul(np.linalg.inv(covXneg), meanXneg))
+def plot_data(X, y,
+              model=None,
+              plot_boarders=True,
+              plot_classification=True,
+              plot_support_vectors=True,
+              plot_size=7,
+              resolution=500,
+              title='data visualization',
+              color=['blue', 'orange']):
+    """Plotting your data
+    @param model already trained SVM model, is None if you want to plot data only
+    all other parameters must be intuitively clear for you"""
 
-    det_neg = -(1 / 2) * np.log(np.linalg.det(covXpos))
-    det_pos = (1 / 2) * np.log(np.linalg.det(covXneg))
+    if model is not None:  # if you want to plot model
+        if plot_classification and plot_boarders:
+            col = 2  # if you want to plot model and boarders
+        else:
+            col = 1  # if you want to plot model only
 
-    par_c = c1_neg + c1_pos + det_neg + det_pos + np.log(p_ypos) - np.log(p_yneg)
+        fig, axs = plt.subplots(1, col, figsize=(plot_size * col, plot_size))
 
-    return par_c
+        grid = get_meshgrid(X, resolution)
+        V = model.support_vectors_
+        mask_sv = model.support_  # np.where(np.isin(X[:,0],V[:,0]))[0]
 
+        kernel = model.kernel
+        if kernel == 'poly':
+            title = f"kernel: {kernel} - degree: {model.degree} - cost:{model.C}"
+        elif kernel == 'rbf':
+            title = f"kernel: {kernel}"
+            if model.gamma != "auto_deprecated":
+                title += f" - gamma: {model.gamma}"
+            title += f" - cost: {model.C}"
 
-def calc_func_g(par_A, par_b, par_c, gridpoints):
-    """
-    Combine the previously calculated parameters to the optimal classification function g.
-    Return in shape [500,500]. The 500x500 grid will plot nicely later.
-    Avoid hardcoding, i.e. use int(np.sqrt(gridpoints.shape[0]) instead of the number 500
-    @param gridpoints, np.array, the points the function g should be applied to
-    returns np.ndarray of shape (500,500)
-    """
-    # your code goes here ↓↓↓
-    g = np.empty((int(np.sqrt(gridpoints.shape[0])), int(np.sqrt(gridpoints.shape[0]))))
-    for x1 in range(g.shape[0]):
-        for x2 in range(g.shape[1]):
-            x_vec = gridpoints[x1 * 500 + x2]
-            g[x1][x2] = (-(1 / 2) * np.matmul(np.transpose(x_vec), np.matmul(par_A, x_vec)) + np.matmul(
-                np.transpose(par_b), x_vec) + par_c)
+        for i in range(col):
+            if col > 1:
+                ax = axs[i]
+            else:
+                ax = axs
+            ax.set_aspect('equal')
+            if i == 0 and plot_boarders:
+                ax.set_title('Margins - ' + title, fontsize=plot_size * 2)
+                boarders = model.decision_function(grid)
+                mask_pos = boarders >= 1
+                mask_neg = boarders <= -1
+                ax.scatter(grid[mask_pos, 0], grid[mask_pos, 1], c=color[0], alpha=0.01, s=10)
+                ax.scatter(grid[mask_neg, 0], grid[mask_neg, 1], c=color[1], alpha=0.01, s=10)
+                ax.scatter(X[mask_sv, 0], X[mask_sv, 1], c='g', label=str(np.sum(model.n_support_)) + ' SV', s=40,
+                           marker='o')
+            if plot_classification and (i == 1 or not plot_boarders):
+                ax.set_title('Classification - ' + title, fontsize=plot_size * 2)
+                classification = model.predict(grid)
+                mask_pos = classification > 0
+                mask_neg = classification < 0
+                ax.scatter(grid[mask_pos, 0], grid[mask_pos, 1], c=color[0], alpha=0.01, s=10)
+                ax.scatter(grid[mask_neg, 0], grid[mask_neg, 1], c=color[1], alpha=0.01, s=10)
+                classification = model.predict(X)
+                mask_wrong = classification != y
+                ax.scatter(X[mask_wrong, 0], X[mask_wrong, 1], c='magenta', label=str(np.sum(mask_wrong)) + ' faults',
+                           s=40, marker='o')
+            m = y > 0
+            ax.scatter(X[m, 0], X[m, 1], c=color[0], label='class +1', s=10)
+            m = np.logical_not(m)
+            ax.scatter(X[m, 0], X[m, 1], c=color[1], label='class -1', s=10)
+            ax.legend(loc='lower left', fontsize=plot_size * 1.5)
 
-    return np.sign(g)
-
-
-# Nothing to do here, just run the cell.
-
-X1, X2 = np.mgrid[-11:11:500j, -11:11:500j]
-gridpoints = np.c_[X1.ravel(), X2.ravel()]
-
-par_A = calc_par_A(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
-par_b = calc_par_b(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
-par_c = calc_par_c(meanXpos, covXpos, meanXneg, covXneg, p_ypos, p_yneg)
-func_g = calc_func_g(par_A, par_b, par_c, gridpoints)
-print("gridponts.shape =", gridpoints.shape, "\n")
-print("func_g.shape =", func_g.shape, "\n")
-print("A = ", par_A)
-print("A.shape = ", par_A.shape, "\n")
-print("b = ", par_b)
-print("b.shape = ", par_b.shape, "\n")
-print("c = ", par_c)
-print("c.shape = ", par_c.shape)
-
-
-# Visualize the data and the classifier with a scatter plot
-def scatter_plot2(X, X1, X2, y, g):
-    """Creates a scatter-plot for the dataset X with labels y and the classification function g
-    Parameters
-    ----------
-    X : np.ndarray
-        data
-    X1: np.ndarray
-        grid x values
-    X2: np.ndarray
-        grid y values
-    y : np.ndarray
-        labels
-    g : np.ndarray
-        the matrix from your Gaussian classifier
-    Returns
-    -------
-    Figure
-        a matplotlib figure object
-    """
-    fig2 = plt.figure(figsize=(8, 5))
-    # your code goes here ↓↓↓
-    fig2 = plt.figure(figsize=(8, 5))
-    # your code goes here ↓↓↓
-    df = pd.DataFrame(dict(
-        x1=X[:, 0],
-        x2=X[:, 1],
-        label=y
-    ))
-
-
-
-
-    plt.scatter(X1[1 == g[:]], X2[1 == g[:]], s=1, alpha=0.05, zorder=-1)
-    plt.scatter(X1[-1 == g[:]], X2[-1 == g[:]], s=1, alpha=0.05, zorder=-1)
+    else:
+        fig, axs = plt.subplots(1, 1, figsize=(plot_size, plot_size))
+        axs.set_aspect('equal')
+        m = y > 0
+        axs.scatter(X[m, 0], X[m, 1], c=color[0], label='class +1', s=10)
+        m = np.logical_not(m)
+        axs.scatter(X[m, 0], X[m, 1], c=color[1], label='class -1', s=10)
+        axs.legend(loc='lower left', fontsize=plot_size * 1.5)
+        plt.title(title, fontsize=plot_size * 2)
     plt.show()
 
-    return fig2
+#load data
+#leave as it is
+X,y = load_data(1)
 
-# Nothing to do here, just run the cell.
-g = calc_func_g(par_A,par_b,par_c,gridpoints)
-fig = scatter_plot2(X, X1, X2, y, g)
-assert isinstance(fig, Figure)
+print(X)
+
+def pol2cart(r, phi):
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+    return(x, y)
+
+def create_new_data() -> Tuple[np.ndarray, np.ndarray]:
+    """Function that creates the new data
+
+    For random numbers use np.random module, not np.random.default_rng
+
+    Hint
+    ----
+    use pol2cart
+
+    Returns
+    -------
+    tuple
+        tuple of 100 2d datapoints and labels (X_new, y_new)
+    """
+    # Your solution here:
+    n = 100
+    rad = 0.25
+    # phi ranges from 0 to 2*pi
+    # (full rotation is 2*pi)
+    phi = np.random.uniform(0, 2 * np.pi, n)
+    # distance from center is in [0, rad]
+    r = np.random.uniform(0, rad, n)
+
+    x1, x2 = pol2cart(r, phi)
+    y_new = np.full(100, -1)
+
+    X_new = np.stack((x1, x2), axis=1)
+    return X_new, y_new
+
+X_new, y_new = create_new_data()
+
+X_new = np.concatenate((X, X_new), axis=0)
+y_new = np.concatenate((y, y_new), axis=0)
+plot_data(X_new, y_new)
+
+def iter_Gamma(gamma_range: Sequence[float], C: float, X_new: np.ndarray, y_new: np.ndarray) -> List[dict]:
+    """
+    Function iter_Gamma fits SVM using defined gamma range and plots every variation.
+    @ gamma_range: list of gammas
+    @ returns: list of dictionaries, length of list = length of gamma_range
+    """
+    list_of_model_parameters = []
+    # your code ↓↓↓
+    # code ends here
+    for gamma in gamma_range:
+        model = svm.SVC(gamma=gamma, C=C)
+        model.fit(X_new, y_new)
+        list_of_model_parameters.append(model.get_params())
+        plot_data(X_new, y_new, model)
+
+    return list_of_model_parameters
+
+# update X_new and y_new by adding point as described in the task↓↓↓
+def add_points(X_new: np.ndarray, y_new: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    # your code here
+    X_new_ = np.append(X_new, [[1.8, 1.3]], axis=0)
+    y_new_ = np.append(y_new, 1)
+    return X_new_, y_new_
+
+# nothing to do, just run the cell
+X_new_plus1, y_new_plus1 = add_points(X_new, y_new)
+
+# This cell is just to discover the behaviour of SVM given the extra point, not graded.
+
+cost_values = range(-1,4)
+gamma_values = [0.1,0.5,0.9]
+
+for cost in cost_values:
+    iter_Gamma(gamma_values,10**cost,X_new_plus1,y_new_plus1)
