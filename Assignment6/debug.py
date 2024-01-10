@@ -9,6 +9,7 @@ from typing import Tuple
 RSEED = 44
 np.random.seed(RSEED)
 
+
 def logistic_gradient(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Function that computes the logistic gradient via the cross-entropy loss.
 
@@ -26,12 +27,13 @@ def logistic_gradient(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray
     np.ndarray
         gradient vector
     """
-    print(w)
-    gradient = np.zeros(shape=np.shape(w))
-    for i in range(len(w)):
-        gradient[i] = np.sum(((1 / (1 - np.exp(np.ndarray.transpose(w)[0] * x[i]))) - y[i]) * x[i])
+    gradient = np.ndarray(shape=np.shape(w))
 
-    print(gradient)
+    for j in range(len(w)):
+        for i in range(len(y)):
+            sigma_i = 1 / (1 + np.exp(-(np.dot(w, x[i]))))
+            gradient[j] += (sigma_i - y[i]) * x[i][j]
+
     return gradient
 
 
@@ -55,9 +57,10 @@ def generate_random(nr_samples: int, nr_features: int, seed=RSEED) -> Tuple[np.n
     # don't change the seed!
     np.random.seed(seed)
 
-    X_random = np.random.normal(size=(nr_features, nr_samples))
-    y_random = np.random.randint(size=(1, nr_samples), low=0, high=2)
-    w_random = np.random.normal(size=(nr_features, 1))
+    # Your code goes here ↓↓↓
+    X_random = np.random.normal(size=(nr_samples, nr_features))
+    y_random = np.random.randint(size=(nr_samples), low=0, high=2)
+    w_random = np.random.normal(size=(nr_features))
 
     return (X_random, y_random, w_random)
 
@@ -135,26 +138,29 @@ def comparison(grad_a: np.ndarray, grad_n: np.ndarray) -> bool:
 
     return close
 
-#Nothing to do here, if you did everything correctly, you can just run this code and should see the correct results
 
-n = 5       #number of samples
-d = 10      #number of features
-eps_list = [1e-1,1e-4,1e-11]     # epsilon values to test
-X_random, y_random, w_random = generate_random(n,10,RSEED)
-analytical_gradient = logistic_gradient(w_random,X_random,y_random)
-num_gradients = numerical_gradient(w_random,X_random,y_random,eps_list,cost)
-comparison_results=[]
+# Nothing to do here, if you did everything correctly, you can just run this code and should see the correct results
+
+n = 5  # number of samples
+d = 10  # number of features
+eps_list = [1e-1, 1e-4, 1e-11]  # epsilon values to test
+X_random, y_random, w_random = generate_random(n, 10, RSEED)
+analytical_gradient = logistic_gradient(w_random, X_random, y_random)
+print("Logistic gradient:\n", analytical_gradient, "\n")
+num_gradients = numerical_gradient(w_random, X_random, y_random, eps_list, cost)
+comparison_results = []
 for grad in num_gradients:
     comparison_results.append(comparison(analytical_gradient, grad))
 # Check outputs
-assert len(comparison_results) == len(eps_list), "List with comparison results should be the same length as there are epsilon values."
-assert isinstance(comparison_results[0],bool), f"Comparison results should be list of booleans."
+assert len(comparison_results) == len(
+    eps_list), "List with comparison results should be the same length as there are epsilon values."
+assert isinstance(comparison_results[0], bool), f"Comparison results should be list of booleans."
 print("Your randomly generated data:\n")
-print("X =",X_random,"\n")
-print("y =",y_random,"\n")
-print("w = ",w_random,"\n")
-print("Logistic gradient:\n",analytical_gradient,"\n")
-for i,res in enumerate(comparison_results):
+print("X =", X_random, "\n")
+print("y =", y_random, "\n")
+print("w = ", w_random, "\n")
+print("Logistic gradient:\n", analytical_gradient, "\n")
+for i, res in enumerate(comparison_results):
     eps_ = eps_list[i]
     print(f"Numerical gradient {i} with epsilon = {eps_}:\n", num_gradients[i], "\n")
-    print("    Vectors within absolute tolerance of 10^-7: ",res, "\n")
+    print("    Vectors within absolute tolerance of 10^-7: ", res, "\n")
