@@ -124,7 +124,7 @@ def cost(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> float:
 
     for i in range(len(y)):
         sigma = 1 / (1 + np.exp(-(np.dot(w, x[i]))))
-        loss += float(y[i] * np.log(sigma) + (1 - y[i]) * np.log(1 - sigma))
+        loss += y[i] * np.log(sigma) + (1 - y[i]) * np.log(1 - sigma)
 
     return -loss
 
