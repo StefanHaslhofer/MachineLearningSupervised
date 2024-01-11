@@ -88,9 +88,16 @@ def numerical_gradient(w: np.ndarray, x: np.ndarray, y: np.ndarray, eps_list: li
     list
         list of same length as eps_list containing the np.ndarrays from the computed gradients for each epsilon in eps_list
     """
-    dw_list = []
-
     # Your code goes here ↓↓↓
+    dw_list = []
+    # Unit 5;p. 41
+    for idx, eps in enumerate(eps_list):
+        dw_list.append(np.zeros(shape=np.shape(w)))
+        for i in range(len(w)):
+            # p. 41
+            e_i = np.zeros(len(w))
+            e_i[i] = 1
+            dw_list[idx][i] = (cost_function(w + eps * e_i, x, y) - cost_function(w - eps * e_i, x, y))/(2*eps)
 
     return dw_list
 
@@ -112,10 +119,14 @@ def cost(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> float:
     float
         cross-entropy loss
     """
-    loss = None
     # Your code goes here ↓↓↓
+    loss = 0
 
-    return loss
+    for i in range(len(y)):
+        sigma = 1 / (1 + np.exp(-(np.dot(w, x[i]))))
+        loss += float(y[i] * np.log(sigma) + (1 - y[i]) * np.log(1 - sigma))
+
+    return -loss
 
 
 def comparison(grad_a: np.ndarray, grad_n: np.ndarray) -> bool:
@@ -136,7 +147,7 @@ def comparison(grad_a: np.ndarray, grad_n: np.ndarray) -> bool:
     """
     close = np.all(np.abs(grad_a - grad_n) <= 1e-7)
 
-    return close
+    return bool(close)
 
 
 # Nothing to do here, if you did everything correctly, you can just run this code and should see the correct results
@@ -146,7 +157,6 @@ d = 10  # number of features
 eps_list = [1e-1, 1e-4, 1e-11]  # epsilon values to test
 X_random, y_random, w_random = generate_random(n, 10, RSEED)
 analytical_gradient = logistic_gradient(w_random, X_random, y_random)
-print("Logistic gradient:\n", analytical_gradient, "\n")
 num_gradients = numerical_gradient(w_random, X_random, y_random, eps_list, cost)
 comparison_results = []
 for grad in num_gradients:
