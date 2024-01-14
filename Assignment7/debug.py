@@ -1,5 +1,14 @@
 # Python Implementation
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
+import torch.optim as optim
+from torchvision import datasets, transforms
+from types import SimpleNamespace
+import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 # Notes on shapes of matrices:
 # the pre-activations and activations should be row-vectors
@@ -9,8 +18,8 @@ import numpy as np
 
 input = np.array([1, 1.5]).reshape(1, -1)
 
-weights_layer1 = ...  # fill in the correct values
-weights_layer2 = ...  # fill in the correct values
+weights_layer1 = np.array([[-0.1, 0.5], [-1, 0], [0.1, -2]])  # fill in the correct values
+weights_layer2 = np.array([[1.2, -1, 0.5]])  # fill in the correct values
 
 assert weights_layer1.shape == (3, 2)
 assert weights_layer2.shape == (1, 3)
@@ -21,18 +30,18 @@ assert weights_layer2.shape == (1, 3)
 
 def relu(x):
     """calculate relu activation of x"""
-    return ...
+    return np.maximum(0, x)
 
 
 def derivative_relu(x):
     """calculate derivative of relu for input x"""
-    return ...
+    return 0 if x < 0 else 1 if x > 0 else None
 
 
 def calc_activation(preactivation):
     """calculate activation given pre-activation
     """
-    return ...
+    return relu(preactivation)
 
 
 def calc_preactivation(x, w):
@@ -41,12 +50,12 @@ def calc_preactivation(x, w):
     x: layer inputs
     w: layer weights
     """
-    return ...
+    return np.sum(x * w)
 
 
 def calc_delta_6(y_hat, y):
     """delta error of last layer"""
-    return ...
+    return y_hat - y
 
 
 def calc_delta(s, delta_6, w):
@@ -58,7 +67,7 @@ def calc_delta(s, delta_6, w):
 
     to get correct inputs check the formulas and their indices ;)
     """
-    return ...
+    return derivative_relu(s) * delta_6 * w
 
 
 def calc_derivative_L(delta_error, activation):
@@ -66,4 +75,19 @@ def calc_derivative_L(delta_error, activation):
     check formulas to now what delta_error and activation you have to
     provide :)
     """
-    return ...
+    return delta_error * activation
+
+
+x1 = 1
+x2 = 1.5
+w31 = -0.1
+w41 = -1
+w51 = 0.1
+w32 = 0.5
+w42 = 0
+w52 = -2
+w63 = 1.2
+w64 = -1
+w65 = 0.5
+
+# TODO test
